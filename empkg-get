@@ -19,7 +19,7 @@ class Arguments:
 		
 		print 'The following package sources will be installed:'
 		for version in to_download:
-			print version.name + ' - ' + version.string
+			print version.package.name + ' - ' + version.string
 		
 		for version in to_download:
 			version.download()
