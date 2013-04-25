@@ -10,7 +10,7 @@ class Arguments:
 		self.parser.add_argument( 'package_names', metavar='LIBRARY', type=str, nargs='*',
 		                          help='packages to download' )
 		
-		self.parser.add_argument( '--ensure', action='store_true',
+		self.parser.add_argument( '--download', action='store_true',
 		                          help='ensures that packages get downloaded before building' )
 		
 		self.args = self.parser.parse_args()
@@ -21,7 +21,7 @@ class Arguments:
 		for package_name in self.args.package_names:
 				versions.append( pkg_module.Package(package_name).highest_version() )
 		
-		if( self.args.ensure ):
+		if( self.args.download ):
 			for version in versions:
 				version.download()
 		
