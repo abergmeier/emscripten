@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import sys, os, requests, urllib, zipfile, tarfile, shutil, subprocess
+import sys, os, urllib, zipfile, tarfile, shutil, subprocess
 import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
 from urlparse import urlparse
 from urlparse import urljoin
@@ -312,20 +312,17 @@ class Version:
 			pass
 		
 		url_tuple = urlparse( self.uri )
-		if url_tuple.scheme == 'file':
-			# Unescape uri encoding first
-			file_path = url_tuple.path
-			if os.path.isdir( file_path ):
-				self.fetch_dir( file_path )
-			else:
-				self.fetch_archive( file_path )
-		else:
+		if url_tuple.scheme == 'file' and os.path.isdir( url_tuple.path ):
+			# fetch a directory
+			self.fetch_dir( url_tuple.path )
+		else: 
+			# fetch a single file
 			# We need to preserve filename, so mime type can be
 			# detected later on
 			file_name = os.path.basename( url_tuple.path )
-			temp_file = tempfile.NamedTemporaryFile( suffix=file_name, dir=lib_dir.dirname )
-			urllib.urlretrieve( self.uri, temp_file.name )
-			self.fetch_archive( temp_file.name )
+			with tempfile.NamedTemporaryFile( suffix=file_name, dir=lib_dir.dirname ) as temp_file:
+				urllib.urlretrieve( self.uri, temp_file.name )
+				self.fetch_archive( temp_file.name )
 		
 
 	def __lt__( self, other ):
@@ -356,23 +353,10 @@ class Package:
 		for repo_uri in lib_dir.repositories():
 			repo_uri = urljoin( repo_uri + '/', package_name + '/versions' )
 			
-			if urlsplit(repo_uri).scheme == 'file':
-				# Unescape uri encoding first
-				file_path = urlparse( repo_uri ).path
-				response = ""
-				with open( file_path, 'r' ) as file:
-					for line in file:
-						response += line
-				config = json.loads( response )
-			else:
-				# Assume we have a URL
-				response = requests.get( repo_uri )
-				try:
-					response.raise_for_status()
-				except:
-					pass #TODO: log
-			
-				config = response.json()
+			with tempfile.NamedTemporaryFile() as temp_file:
+				urllib.urlretrieve( repo_uri, temp_file.name )
+
+				config = json.load( temp_file )
 
 			if self.uri is None:
 				self.uri    = config.get( "src" )
