@@ -1,1 +1,30 @@
 #!/usr/bin/env python2
+
+import argparse, shutil, os
+from tools import pkg as pkg_module
+
+class Arguments:
+	def __init__( self ):
+		self.parser = argparse.ArgumentParser()
+		
+		self.parser.add_argument( 'package_names', metavar='PACKAGE', type=str, nargs='*',
+		                          help='packages to remove' )
+		
+		self.args = self.parser.parse_args()
+	
+	def handle( self ):
+		to_remove = []
+		for package_name in self.args.package_names:
+			to_remove.append( pkg_module.Package(package_name).highest_version() )
+		
+		print 'The following packages will be removed:'
+		for version in to_remove:
+			print version.package.name + ' - ' + version.string
+		
+		for version in to_remove:
+			if os.path.isdir( version.system_path() ):
+				shutil.rmtree( version.system_path() )
+
+args = Arguments()
+args.handle()
+
