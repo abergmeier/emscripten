@@ -27,7 +27,6 @@ class Arguments:
 		
 		for version in versions:
 			version.build()
-			assert version.has_pc_file()
 
 args = Arguments()
 args.handle()
