@@ -223,6 +223,7 @@ class Version:
 		env[ 'PKG_CONFIG_LIBDIR'     ] = os.pathsep.join( search_paths )
 		env[ 'PATH'                  ] += os.pathsep + shared.__rootpath__
 		env[ 'EMSCRIPTEN_SYSTEM_ROOT'] = self.system_path()
+		env[ 'EMSCRIPTEN_ROOT'       ] = shared.__rootpath__.replace('\\', '/')
 	
 		for build_command in self.build_commands:
 			has_url = False
