@@ -244,15 +244,12 @@ class Version:
 				# We have to close the file for this process because most os do not allow
 				# for multiple processes accessing the same file concurrently
 				os.close( temp_tuple[0] )
-			else:
-				temp_file_path = None
-
-			try:
-				#TODO: Check whether built succeeded
-				subprocess.check_call( build_command, shell=(not has_url), cwd=self.path(), env=env )
-			finally:
-				if temp_file_path is not None:
+				try:
+					subprocess.check_call( build_command, cwd=self.path(), env=env )
+				finally:
 					os.remove( temp_file_path )
+			else:
+				subprocess.check_call( ['sh', '-c', build_command], cwd=self.path(), env=env )
 		
 	
 	def is_built( self ):
