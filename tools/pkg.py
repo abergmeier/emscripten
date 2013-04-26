@@ -364,10 +364,12 @@ class Package:
 		
 			if len( self.build_commands ) is 0:
 				commands = config.get( "build" )
-				if commands is str:
-					self.build_commands = [commands]
-				else:
+				if commands is None:
+					pass
+				elif type(commands) is list:
 					self.build_commands = commands
+				else:
+					self.build_commands = [commands]
 		
 			for version_config in config.get("versions"):
 				#FIXME: This is stricter, than looseversion is
