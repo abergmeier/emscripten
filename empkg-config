@@ -43,7 +43,7 @@ class Arguments:
 
 args = Arguments()
 
-search_paths = pkg_module.libcache.config_search_paths()
+search_paths = pkg_module.lib_dir.config_search_paths()
 
 env = os.environ.copy()
 # We have to preserve PKG_CONFIG_PATH values, but our own
