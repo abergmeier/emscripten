@@ -390,6 +390,6 @@ class Package:
 		return lib_dir.get_system_path( self.name )
 	
 	def highest_version( self ):
-		return self.versions[0]
+		return self.versions[-1]
 		
 		
