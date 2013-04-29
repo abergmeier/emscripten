@@ -7,6 +7,7 @@ from urlparse import urljoin
 from urlparse import urlsplit
 
 from tools import shared
+from string import Template
 
 # For version comparison 
 from distutils.version import LooseVersion
@@ -225,7 +226,12 @@ class Version:
 		env[ 'EMSCRIPTEN_SYSTEM_ROOT'] = self.system_path()
 		env[ 'EMSCRIPTEN_ROOT'       ] = shared.__rootpath__.replace('\\', '/')
 	
+		builders = { "pkg-config": Builders.pkg_config,
+		             "sh"        : Builders.shell
+		}
+
 		for build_command in self.build_commands:
+			"""
 			has_url = False
 			try:
 				build_command = build_command.get( 'url' )
@@ -250,7 +256,15 @@ class Version:
 				finally:
 					os.remove( temp_file_path )
 			else:
-				subprocess.check_call( ['sh', '-c', build_command], cwd=self.path(), env=env )
+			"""
+			try:
+				builder_name = build_command[ "builder" ]
+			except (KeyError, TypeError):
+				# Shell is default
+				builder_name = "sh"
+				
+			builder = builders[builder_name]
+			builder( build_command, self.path(), env )
 		
 	
 	def is_built( self ):
@@ -402,4 +416,47 @@ class Package:
 	def highest_version( self ):
 		return self.versions[-1]
 		
+class Builders:
+	@staticmethod
+	def pkg_config( command, cwd, env ):
+		arguments = command[ "arguments" ]
+
+		file    = Template( arguments["file"   ] ).substitute( env )
+		prefix  = Template( arguments["prefix" ] ).substitute( env )
+		name    = Template( arguments["name"   ] ).substitute( env )
+		version = Template( arguments["version"] ).substitute( env )
+
+		try:
+			description = arguments[ "description" ]
+		except KeyError:
+			description = ""
+
+		try:
+			libs = arguments[ "libs" ]
+		except KeyError:
+			libs = ""
+
+		try:
+			cflags = arguments[ "cflags" ]
+		except KeyError:
+			cflags = ""
 		
+		shared.safe_ensure_dirs( os.path.dirname(file) )
+
+		with open( file, "w" ) as config_file:
+			config_file.write( "prefix=%s\n"
+		"exec_prefix=${prefix}\n"
+		"libdir=${exec_prefix}/lib\n"
+		"sharedlibdir=${libdir}\n"
+		"includedir=${prefix}/include\n"
+		"Name:%s\n"
+		"Description:%s\n"
+		"Version:%s\n"
+		"Libs:%s\n"
+		"Cflags:%s\n" % (prefix, name, description, version, libs, cflags)
+			)
+
+	@staticmethod
+	def shell( command, cwd, env ):
+		subprocess.check_call( ['sh', '-c', command], cwd=cwd, env=env )
+

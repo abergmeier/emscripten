@@ -1,0 +1,110 @@
+#!/usr/bin/env python2
+
+import argparse
+from tools import pkg as pkg_module
+
+class Arguments:
+	def __init__( self ):
+		self.parser = argparse.ArgumentParser()
+		
+		packages_dict = dict( metavar='PACKAGE', type=str, nargs='*' )
+		subparsers = self.parser.add_subparsers()
+		def add_build_parser( name ):
+			buildParser = subparsers.add_parser( name )
+			buildParser.add_argument( 'build_package_names',
+			                          help='packages to build',
+			                          **packages_dict )
+		
+			buildParser.add_argument( '--download', action='store_true',
+			                          help='ensures that packages get downloaded before building' )
+		def add_get_parser( name ):
+			getParser = subparsers.add_parser( name )
+			getParser.add_argument( 'get_package_names',
+			                        help='package sources to download',
+			                        **packages_dict )
+		def add_purge_parser( name ):
+			purgeParser = subparsers.add_parser( name )
+			purgeParser = purgeParser.add_argument( 'purge_package_names',
+			                                        help='package sources to remove',
+			                                        **packages_dict )
+		
+		def add_remove_parser( name ):
+			removeParser = subparsers.add_parser( name )
+			removeParser.add_argument( 'remove_package_names',
+			                           help='packages to remove',
+			                           **packages_dict )
+		
+		add_get_parser   ( 'get'    )
+		add_build_parser ( 'build'  )
+		add_remove_parser( 'remove' )
+		add_purge_parser ( 'purge'  )
+		
+		self.args = self.parser.parse_args()
+		
+	def handle_build( self, package_names ):
+		versions = []
+		
+		for package_name in package_names:
+				versions.append( pkg_module.Package(package_name).highest_version() )
+		
+		if( self.args.download ):
+			for version in versions:
+				version.download()
+		
+		for version in versions:
+			version.build()
+	
+	def handle_get( self, package_names ):
+		to_download = []
+		for package_name in package_names:
+			to_download.append( pkg_module.Package(package_name).highest_version() )
+		
+		print 'The following package sources will be installed:'
+		for version in to_download:
+			print version.package.name + ' - ' + version.string
+
+		for version in to_download:
+			version.fetch()
+	
+	def handle_purge( self, package_names ):
+		to_purge = []
+		for package_name in package_names:
+			to_purge.append( pkg_module.Package(package_name).highest_version() )
+		
+		print 'The following packages and sources will be removed:'
+		for version in to_purge:
+			print version.package.name + ' - ' + version.string
+		
+		for version in to_purge:
+			if os.path.isdir( version.system_path() ):
+				shutil.rmtree( version.system_path() )
+			
+			if os.path.isdir( version.path() ):
+				shutil.rmtree( version.path() )
+	
+	def handle_remove( self, package_names ):
+		to_remove = []
+		for package_name in package_names:
+			to_remove.append( pkg_module.Package(package_name).highest_version() )
+		
+		print 'The following packages will be removed:'
+		for version in to_remove:
+			print version.package.name + ' - ' + version.string
+		
+		for version in to_remove:
+			if os.path.isdir( version.system_path() ):
+				shutil.rmtree( version.system_path() )
+		
+	def handle( self ):
+		config = dict( get_package_names    = self.handle_get,
+		               build_package_names  = self.handle_build,
+		               remove_package_names = self.handle_remove,
+		               purge_package_names  = self.handle_purge )
+		for name, handler in config.iteritems():
+			package_names = getattr( self.args, name, [] )
+			if len( package_names ) is not 0:
+				handler( package_names )
+
+args = Arguments()
+args.handle()
+
