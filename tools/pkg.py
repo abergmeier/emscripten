@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-import sys, os, urllib, zipfile, tarfile, shutil, subprocess
+import sys, os, urllib2, zipfile, tarfile, shutil, subprocess, contextlib
 import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
 from urlparse import urlparse
 from urlparse import urljoin
@@ -237,7 +237,8 @@ class Version:
 				# Download first
 				temp_tuple = tempfile.mkstemp( suffix='.py', text=True )
 				temp_file_path = temp_tuple[1]
-				urllib.urlretrieve( build_command, temp_file_path )
+				with contextlib.closing( urllib2.urlopen(build_command) ) as file:
+					temp_file_path.write( file )
 				# Make sure we have exec permissions
 				#os.chmod( temp_file_path, stat.S_IRUSR | stat.S_IEXEC | stat.S_IWUSR )
 				build_command = [ 'python2', temp_file_path ]
@@ -319,7 +320,10 @@ class Version:
 			# detected later on
 			file_name = os.path.basename( url_tuple.path )
 			with tempfile.NamedTemporaryFile( suffix=file_name, dir=lib_dir.dirname ) as temp_file:
-				urllib.urlretrieve( self.uri, temp_file.name )
+				with contextlib.closing( urllib2.urlopen(self.uri) ) as file:
+					temp_file.write( file.read() )
+					# We have to flush or the data does not get written
+					temp_file.flush()
 				self.fetch_archive( temp_file.name )
 		
 
@@ -351,10 +355,16 @@ class Package:
 		for repo_uri in lib_dir.repositories():
 			repo_uri = urljoin( repo_uri + '/', package_name + '/versions' )
 			
-			with tempfile.NamedTemporaryFile() as temp_file:
-				urllib.urlretrieve( repo_uri, temp_file.name )
-
-				config = json.load( temp_file )
+			try:
+				with contextlib.closing( urllib2.urlopen(repo_uri) ) as temp_file:
+					try:
+						config = json.load( temp_file )
+					except:
+						print >> sys.stderr, 'Invalid json format from ' + repo_uri
+						continue
+			except urllib2.HTTPError, e:
+				print >> sys.stderr, repo_uri + ' ' + str(e.code) + ': ' + e.msg
+				continue
 
 			if self.uri is None:
 				self.uri    = config.get( "src" )
