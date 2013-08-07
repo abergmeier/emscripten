@@ -6,13 +6,10 @@ from tools import shared
 cmake_path = shared.path_from_root('cmake')
 
 platform_path = os.path.join(cmake_path, 'Platform')
-if os.name == 'nt':
-  toolchain_file_path = os.path.join(platform_path, 'Emscripten.cmake')
-else:
-  toolchain_file_path = os.path.join(platform_path, 'Emscripten_unix.cmake')
+toolchain_file_path = os.path.join(platform_path, 'Emscripten.cmake')
 
 added_arguments = [ '-DCMAKE_TOOLCHAIN_FILE=' + toolchain_file_path,
-                    '-DCMAKE_MODULE_PATH=' + cmake_path.replace('\\', '/'),
-                    '-GUnix Makefiles' ]
+                    '-DCMAKE_MODULE_PATH=' + cmake_path.replace('\\', '/')
+]
 exit(subprocess.call([sys.argv[1]] + added_arguments + sys.argv[2:]))
 
