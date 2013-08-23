@@ -1,13 +1,14 @@
 #!/usr/bin/env python2
 
 import sys, os, urllib2, zipfile, tarfile, shutil, subprocess, contextlib
-import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
+import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json, xdg
 from urlparse import urlparse
 from urlparse import urljoin
 from urlparse import urlsplit
 
 from tools import shared
 from string import Template
+from xdg import BaseDirectory
 
 # For version comparison 
 from distutils.version import LooseVersion
@@ -34,18 +35,28 @@ def mergesort( lst ):
 	right = mergesort( lst[middle:] )
 	return merge( left, right )
 
-EM_LIBS = "~/.emscripten-libs"
-
 rel_search_paths = [ os.path.join( 'lib'  , 'pkgconfig'),
-                     os.path.join( 'share', 'pkgconfig')  ]
+                     os.path.join( 'share', 'pkgconfig')
+]
+
+# TODO: Also enable for Windows and MacOSX
+
+CONFIG = { "dir": { "data"  : BaseDirectory.xdg_data_home,
+                    "config": BaseDirectory.xdg_config_home
+           },
+           "folder": "emscripten-libs"
+}
 
 class LibDir:
 	def __init__( self ):
-		self.dirname = os.path.expanduser( EM_LIBS )
+		self.dirname = os.path.join( CONFIG["dir"]["data"], CONFIG["folder"] )
 		self.system_versions_selector = os.path.join( self.get_system_path(), '*', '*' )
 	
 	def get_path( self, path ):
 		return os.path.join( self.dirname, path )
+
+	def get_config_path( self, path ):
+		return os.path.join( CONFIG["dir"]["config"], CONFIG["folder"], path );
 	
 	def get_source_path( self, path=None ):
 		sourcePath = self.get_path( 'sources' )
@@ -75,7 +86,7 @@ class LibDir:
 	
 	def repositories( self ):
 		repos = []
-		repo_config_path = self.get_path( 'repos' )
+		repo_config_path = self.get_config_path( 'repos' )
 		
 		def read_config_file():
 			with open( repo_config_path, 'r' ) as file:
@@ -83,8 +94,11 @@ class LibDir:
 					repos.append( line.strip(' \t\n\r') )
 		try:
 			read_config_file()
-		except:
-			print >> repo_config_path, 'https://raw.github.com/abergmeier/emscripten-libs/master'
+		except IOError:
+			os.makedirs( os.path.dirname(repo_config_path) )
+
+			with open(repo_config_path, 'w') as config_file:
+				print >> config_file, 'https://raw.github.com/abergmeier/emscripten-libs/master'
 			read_config_file()
 		return repos
 
@@ -126,14 +140,17 @@ class Extract:
 		# Since xz support is only available in 3.4 python, try commandline
 		# TODO: Replace this by python impl when switching to python3
 		
-		# We need file extension for tar
-		new_src = src + '.tar.xz'
-		try:
-			os.remove( new_src )
-		except:
-			pass
-		os.rename( src, new_src )
-		src = new_src
+		if not src.endswith( '.tar.xz' ):
+			# We need file extension for tar
+			new_src = src + '.tar.xz'
+
+			try:
+				os.remove( new_src )
+			except:
+				pass
+			os.rename( src, new_src )
+
+			src = new_src
 		
 		command = [ 'tar', '-C', dest, '-xJf', src ]
 		subprocess.check_call( command )
@@ -208,7 +225,7 @@ class Version:
 		return os.path.join( self.package.system_path(), self.string )
 	
 	def set_prefix( self ):
-		os.environ["prefix"] = self.path()
+		os.environ["prefix"] = self.system_path()
 	
 	def build( self ):
 		if len( self.build_commands ) is 0:
@@ -333,6 +350,7 @@ class Version:
 			# We need to preserve filename, so mime type can be
 			# detected later on
 			file_name = os.path.basename( url_tuple.path )
+
 			with tempfile.NamedTemporaryFile( suffix=file_name, dir=lib_dir.dirname ) as temp_file:
 				with contextlib.closing( urllib2.urlopen(self.uri) ) as file:
 					temp_file.write( file.read() )
