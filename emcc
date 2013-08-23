@@ -859,6 +859,12 @@ try:
   def validate_arg_level(level_string, max_level, err_msg):
     try:
       level = int(level_string)
+    except:
+      raise Exception(err_msg)
+
+    try:
+      # For gcc compat - clamp levels too high
+      level = min( level, max_level )
       assert 0 <= level <= max_level
     except:
       raise Exception(err_msg)
