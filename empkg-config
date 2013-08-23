@@ -8,41 +8,6 @@ import fnmatch
 import glob
 from tools import pkg as pkg_module
 
-class Arguments:
-	def __init__(self):
-		self.parser = argparse.ArgumentParser()
-
-		self.parser.add_argument( 'package_names', metavar='LIBRARY', type=str, nargs='*',
-		                          help='packages to get configuration for' )
-
-		self.parser.add_argument( '--libs', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-
-		self.parser.add_argument( '--cflags', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-
-		self.parser.add_argument( '--exists', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-
-		self.parser.add_argument( '--modversion', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-
-		self.parser.add_argument( '--print-errors', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-
-		self.parser.add_argument( '--silence-errors', action='store_true',
-		                          help='sum the integers (default: find the max)' )
-		
-		self.args = self.parser.parse_args()
-
-	def delegate( self, name ):
-		if getattr( self.args, name, False ):
-			return '--' + name
-		else:
-			return ''
-
-args = Arguments()
-
 search_paths = pkg_module.lib_dir.config_search_paths()
 
 env = os.environ.copy()
@@ -53,9 +18,7 @@ env = os.environ.copy()
 
 env['PKG_CONFIG_LIBDIR'] = os.pathsep.join( search_paths )
 
-cflags = args.delegate( "cflags" )
-libs   = args.delegate( "libs"   )
-exists = args.delegate( "exists" )
+command = [ 'pkg-config' ] + sys.argv[1:]
 
-sys.exit( subprocess.call(['pkg-config', cflags, libs, exists, ' '.join( args.args.package_names )], env=env) )
+sys.exit( subprocess.call(command, env=env) )
 
