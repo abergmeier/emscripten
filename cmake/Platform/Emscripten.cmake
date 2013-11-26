@@ -44,6 +44,9 @@ endif()
 # Normalize, convert Windows backslashes to forward slashes or CMake will crash.
 get_filename_component(EMSCRIPTEN_ROOT_PATH "${EMSCRIPTEN_ROOT_PATH}" ABSOLUTE)
 
+# Use our way of finding pkg-configs
+set(PKG_CONFIG_EXECUTABLE "${EMSCRIPTEN_ROOT_PATH}/empkg-config")
+
 if (NOT CMAKE_MODULE_PATH)
 	set(CMAKE_MODULE_PATH "")
 endif()
