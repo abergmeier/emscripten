@@ -44,9 +44,6 @@ endif()
 # Normalize, convert Windows backslashes to forward slashes or CMake will crash.
 get_filename_component(EMSCRIPTEN_ROOT_PATH "${EMSCRIPTEN_ROOT_PATH}" ABSOLUTE)
 
-# Use our way of finding pkg-configs
-set(PKG_CONFIG_EXECUTABLE "${EMSCRIPTEN_ROOT_PATH}/empkg-config")
-
 if (NOT CMAKE_MODULE_PATH)
 	set(CMAKE_MODULE_PATH "")
 endif()
@@ -75,6 +72,9 @@ endif()
 if ("${CMAKE_RANLIB}" STREQUAL "")
 	set(CMAKE_RANLIB "${EMSCRIPTEN_ROOT_PATH}/emranlib${EMCC_SUFFIX}")
 endif()
+
+# Only handle Emscripten packages
+set(PKG_CONFIG_EXECUTABLE "${EMSCRIPTEN_ROOT_PATH}/empkg-config" CACHE STRING "PkgConfig Tool for Emscripten packages")
 
 # Don't do compiler autodetection, since we are cross-compiling.
 include(CMakeForceCompiler)
