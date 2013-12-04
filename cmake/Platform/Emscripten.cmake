@@ -50,6 +50,7 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${EMSCRIPTEN_ROOT_PATH}/cmake/Modules")
 
 set(CMAKE_FIND_ROOT_PATH "${EMSCRIPTEN_ROOT_PATH}/cmake")
+list( APPEND CMAKE_FIND_ROOT_PATH $ENV{HOME}/.local/share/emscripten-libs )
 
 if (CMAKE_HOST_WIN32)
 	set(EMCC_SUFFIX ".bat")
