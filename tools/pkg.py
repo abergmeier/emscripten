@@ -463,15 +463,15 @@ class Builders:
 
 		with open( file, "w" ) as config_file:
 			config_file.write( "prefix=%s\n"
-		"exec_prefix=${prefix}\n"
-		"libdir=${exec_prefix}/lib\n"
-		"sharedlibdir=${libdir}\n"
-		"includedir=${prefix}/include\n"
-		"Name:%s\n"
-		"Description:%s\n"
-		"Version:%s\n"
-		"Libs:%s\n"
-		"Cflags:%s\n" % (prefix, name, description, version, libs, cflags)
+			                   "exec_prefix=${prefix}\n"
+			                   "libdir=${exec_prefix}/lib\n"
+			                   "sharedlibdir=${libdir}\n"
+			                   "includedir=${prefix}/include\n"
+			                   "Name:%s\n"
+			                   "Description:%s\n"
+			                   "Version:%s\n"
+			                   "Libs:%s\n"
+			                   "Cflags:%s\n" % (prefix, name, description, version, libs, cflags)
 			)
 
 	@staticmethod
