@@ -447,7 +447,10 @@ class Builders:
 		try:
 			description = arguments[ "description" ]
 		except KeyError:
-			description = ""
+			try:
+				description = arguments[ "desc" ]
+			except KeyError:
+				description = ""
 
 		try:
 			libs = arguments[ "libs" ]
