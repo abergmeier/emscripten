@@ -17,15 +17,19 @@ find_path( POCO_INCLUDE_DIR
 )
 
 set( POCO_LIBRARY_LIST "" )
+set( index 0 )
 
 foreach( POCO_LIB ${POCO_LIBRARIES} )
 
-	find_library( POCO_LIBRARY
+	# FIXME: need find_library with different variables,
+	# since it works only for the first call
+	find_library( POCO_LIBRARY${index}
 		NAMES ${POCO_LIB}
 		HINTS ${POCO_LIBDIR} ${POCO_LIBRARY_DIRS}
 	)
 
-	list( APPEND POCO_LIBRARY_LIST "${POCO_LIBRARY}" )
+	list( APPEND POCO_LIBRARY_LIST "${POCO_LIBRARY${index}}" )
+	MATH(EXPR index "${index}+1")
 endforeach()
 
 set( POCO_LIBRARIES    ${POCO_LIBRARY_LIST} )
