@@ -375,7 +375,14 @@ class Version:
 		return self.version >= other.version
 
 class Package:
+	@staticmethod
+	def validate( package_name ):
+		return package_name.replace(" ","").replace("_","-")
+
 	def __init__( self, package_name ):
+		valid_name = Package.validate(package_name)
+		if not valid_name == package_name:
+			raise Exception( "Did you mean %s" % valid_name )
 		self.name = package_name
 		self.uri  = None
 		self.ignore_archive_root = None
