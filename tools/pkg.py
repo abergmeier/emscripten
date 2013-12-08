@@ -392,7 +392,7 @@ class Package:
 		
 		# Load all information top down
 		for repo_uri in lib_dir.repositories():
-			repo_uri = urljoin( repo_uri + '/', package_name + '/versions' )
+			repo_uri = urljoin( repo_uri + '/', package_name + '/package.json' )
 			
 			try:
 				with contextlib.closing( urllib2.urlopen(repo_uri) ) as temp_file:
