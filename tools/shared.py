@@ -868,6 +868,7 @@ class Building:
     env['HOST_CXXFLAGS'] = "-W" #if set to nothing, CXXFLAGS is used, which we don't want
     env['PKG_CONFIG_LIBDIR'] = path_from_root('system', 'local', 'lib', 'pkgconfig') + os.path.pathsep + path_from_root('system', 'lib', 'pkgconfig')
     env['PKG_CONFIG_PATH'] = os.environ.get ('EM_PKG_CONFIG_PATH') or ''
+    env['PKG_CONFIG'     ] = path_from_root('empkg-config')
     env['EMSCRIPTEN'] = path_from_root()
     return env
 
