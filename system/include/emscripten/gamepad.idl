@@ -1,0 +1,60 @@
+partial interface Navigator {
+    readonly attribute Gamepad[] gamepads;
+};
+
+interface Gamepad {
+  readonly attribute string       id;
+  // An ordinal associated with this gamepad, zero-based.
+  readonly attribute long         index;
+  // Absolute wallclock time in msec units of when the data was recorded.
+  readonly attribute DOMTimeStamp timestamp;
+  // The analog state of the gamepad axes, in the range [-1, 1].
+  readonly attribute float[]     axes;
+  // The analog state of the gamepad buttons, in the range [0, 1].
+  readonly attribute float[]      buttons;
+};
+
+/*
+ * Represents the current snapshot state of a gamepad.
+ * http://www.w3.org/TR/gamepad/#gamepad-interface
+ */
+interface GamepadEvent : Event {
+    readonly attribute Gamepad gamepad;
+};
+
+/*
+typedef struct EmscriptenGamepadEvent {
+  
+  // The number of valid axes entries in the axis array.
+  int numAxes;
+  // The number of valid button entries in the analogButton and digitalButton arrays.
+  int numButtons;
+
+  // The digital state of the gamepad buttons, either 0 or 1.
+  EM_BOOL digitalButton[64];
+  // Specifies whether this gamepad is connected to the browser page.
+  EM_BOOL connected;
+  
+  // An ID for the brand or style of the connected gamepad device. Typically, this will include the USB vendor and a product ID.
+  EM_UTF8 id[64];
+  // A string that identifies the layout or control mapping of this device.
+  EM_UTF8 mapping[64];
+};
+*/
+
+/*
+ * Registers a callback function for receiving the gamepadconnected and gamepaddisconnected events.
+ * http://www.w3.org/TR/gamepad/
+ */
+extern EMSCRIPTEN_RESULT emscripten_set_gamepadconnected_callback(void *userData, int useCapture, EM_BOOL (*func)(int eventType, const EmscriptenGamepadEvent *gamepadEvent, void *userData));
+extern EMSCRIPTEN_RESULT emscripten_set_gamepaddisconnected_callback(void *userData, int useCapture, EM_BOOL (*func)(int eventType, const EmscriptenGamepadEvent *gamepadEvent, void *userData));
+
+/*
+ * Returns the number of gamepads connected to the system or EMSCRIPTEN_RESULT_NOT_SUPPORTED if the current browser does not support gamepads.
+ * Note: A gamepad does not show up as connected until a button on it is pressed.
+ */
+extern int emscripten_get_num_gamepads();
+/*
+ * Returns a snapshot of the current gamepad state.
+ */
+extern EMSCRIPTEN_RESULT emscripten_get_gamepad_status(int index, EmscriptenGamepadEvent *gamepadState);
