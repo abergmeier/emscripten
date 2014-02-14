@@ -1,15 +1,16 @@
 #!/usr/bin/env python2
 
 import sys, os, urllib2, zipfile, tarfile, shutil, subprocess, contextlib
-import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json, xdg
+import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
 from urlparse import urlparse
 from urlparse import urljoin
 from urlparse import urlsplit
 
 from tools import shared
 from string import Template
-from xdg import BaseDirectory
 
+class extensible(dict):
+  pass
 # For version comparison 
 from distutils.version import LooseVersion
 
@@ -39,24 +40,45 @@ rel_search_paths = [ os.path.join( 'lib'  , 'pkgconfig'),
                      os.path.join( 'share', 'pkgconfig')
 ]
 
-# TODO: Also enable for Windows and MacOSX
+def get_platform_paths():
+  # Incredibly ugly platform path handling
+  if sys.platform.startswith('linux'):
+    import xdg
+    from xdg import BaseDirectory
+    return BaseDirectory.xdg_data_home, BaseDirectory.xdg_config_home
 
-CONFIG = { "dir": { "data"  : BaseDirectory.xdg_data_home,
-                    "config": BaseDirectory.xdg_config_home
-           },
-           "folder": "emscripten-libs"
-}
+  elif sys.platform.startswith('darwin'):
+    from AppKit import NSSearchPathForDirectoriesInDomains
+    # http://developer.apple.com/DOCUMENTATION/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSSearchPathForDirectoriesInDomains
+    # NSApplicationSupportDirectory = 14
+    # NSUserDomainMask = 1
+    # True for expanding the tilde into a fully qualified path
+    data_path = NSSearchPathForDirectoriesInDomains(14, 1, True)[0]
+    # TODO: See whether there is something more similar to a config directory in OSX
+    return data_path, data_path
+
+  elif sys.platform.startswith('win'):
+    from win32com.shell import shellcon, shell
+    return shell.SHGetFolderPath(0, shellcon.CSIDL_COMMON_APPDATA, 0, 0), shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
+
+  else:
+    raise Exception('User path handling for platform %s missing' % sys.platform
+
+CONFIG = extensible()
+CONFIG.dirs = extensible()
+CONFIG.dirs.data, CONFIG.dirs.config = get_platform_paths()
+CONFIG.folder = 'emscripten-libs'
 
 class LibDir:
 	def __init__( self ):
-		self.dirname = os.path.join( CONFIG["dir"]["data"], CONFIG["folder"] )
+		self.dirname = os.path.join( CONFIG.dirs.data, CONFIG.folder )
 		self.system_versions_selector = os.path.join( self.get_system_path(), '*', '*' )
 	
 	def get_path( self, path ):
 		return os.path.join( self.dirname, path )
 
 	def get_config_path( self, path ):
-		return os.path.join( CONFIG["dir"]["config"], CONFIG["folder"], path );
+		return os.path.join( CONFIG.dirs.config, CONFIG.folder, path );
 	
 	def get_source_path( self, path=None ):
 		sourcePath = self.get_path( 'sources' )
