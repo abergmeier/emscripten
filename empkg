@@ -40,12 +40,12 @@ class Arguments:
 		add_purge_parser ( 'purge'  )
 		
 		self.args = self.parser.parse_args()
-		
-	def handle_build( self, package_names ):
+	
+	def handle_build( self, package_versions ):
 		versions = []
 		
-		for package_name in package_names:
-				versions.append( pkg_module.Package(package_name).highest_version() )
+		for package_version in package_versions:
+			versions.append(package_version)
 		
 		if( self.args.download ):
 			for version in versions:
@@ -54,10 +54,10 @@ class Arguments:
 		for version in versions:
 			version.build()
 	
-	def handle_get( self, package_names ):
+	def handle_get( self, package_versions ):
 		to_download = []
-		for package_name in package_names:
-			to_download.append( pkg_module.Package(package_name).highest_version() )
+		for package_version in package_versions:
+			to_download.append(package_version)
 		
 		print 'The following package sources will be installed:'
 		for version in to_download:
@@ -66,10 +66,10 @@ class Arguments:
 		for version in to_download:
 			version.fetch()
 	
-	def handle_purge( self, package_names ):
+	def handle_purge( self, package_versions ):
 		to_purge = []
-		for package_name in package_names:
-			to_purge.append( pkg_module.Package(package_name).highest_version() )
+		for package_version in package_versions:
+			to_purge.append(package_version)
 		
 		print 'The following packages and sources will be removed:'
 		for version in to_purge:
@@ -82,10 +82,10 @@ class Arguments:
 			if os.path.isdir( version.path() ):
 				shutil.rmtree( version.path() )
 	
-	def handle_remove( self, package_names ):
+	def handle_remove( self, package_versions ):
 		to_remove = []
-		for package_name in package_names:
-			to_remove.append( pkg_module.Package(package_name).highest_version() )
+		for package_version in package_versions:
+			to_remove.append(package_version)
 		
 		print 'The following packages will be removed:'
 		for version in to_remove:
@@ -102,8 +102,24 @@ class Arguments:
 		               purge_package_names  = self.handle_purge )
 		for name, handler in config.iteritems():
 			package_names = getattr( self.args, name, [] )
-			if len( package_names ) is not 0:
-				handler( package_names )
+			
+			if len( package_names ) is 0:
+				continue
+			
+			package_versions = []
+			
+			# Extract version information
+			for i in range(len(package_names)):
+				version_tuple = package_names[i].split('=')
+				
+				package_name = version_tuple[0]
+				if len(version_tuple) is 1:
+					package_version = pkg_module.Package(package_name).highest_version()
+				else:
+					package_version = pkg_module.Package(package_name).version(version_tuple[1])
+				package_versions.append(package_version)
+			
+			handler( package_versions )
 
 args = Arguments()
 args.handle()

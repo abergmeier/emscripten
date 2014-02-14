@@ -3,38 +3,19 @@
 import sys, os, urllib2, zipfile, tarfile, shutil, subprocess, contextlib
 import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
 from urlparse import urlparse
-from urlparse import urljoin
-from urlparse import urlsplit
+from functools import partial
 
 from tools import shared
 from string import Template
 
-class extensible(dict):
+class extensible(object):
   pass
+
+sys.path = [shared.path_from_root('third_party', 'requests')] + sys.path
+import requests
+
 # For version comparison 
 from distutils.version import LooseVersion
-
-def mergesort( lst ):
-	def merge( left, right ):
-		result = []
-		i ,j = 0, 0
-		while i < len(left) and j < len(right):
-			if left[i] <= right[j]:
-				result.append(left[i])
-				i += 1
-			else:
-				result.append(right[j])
-				j += 1
-		result += left[i:]
-		result += right[j:]
-		return result
-
-	if len(lst) <= 1:
-		return lst
-	middle = int( len(lst) / 2 )
-	left  = mergesort( lst[:middle] )
-	right = mergesort( lst[middle:] )
-	return merge( left, right )
 
 rel_search_paths = [ os.path.join( 'lib'  , 'pkgconfig'),
                      os.path.join( 'share', 'pkgconfig')
@@ -62,7 +43,7 @@ def get_platform_paths():
     return shell.SHGetFolderPath(0, shellcon.CSIDL_COMMON_APPDATA, 0, 0), shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, 0, 0)
 
   else:
-    raise Exception('User path handling for platform %s missing' % sys.platform
+    raise Exception('User path handling for platform %s missing' % sys.platform)
 
 CONFIG = extensible()
 CONFIG.dirs = extensible()
@@ -195,50 +176,144 @@ class Stamp:
 	@staticmethod
 	def create( dir_path ):
 		print >> os.path.join(dir_path, stamp_name), '{ "version": "' + shared.EMSCRIPTEN_VERSION + '" }'
+		
+class BaseConfig:
+	def __init__(self, jsonConfig):
+		try:
+			self.name = jsonConfig['name']
+		except KeyError:
+			pass
+		
+		try:
+			self.version = jsonConfig['version']
+		except KeyError:
+			pass
+		
+		try:
+			contributors = jsonConfig['contributors']
+			self.contributors = extensible()
+		except KeyError:
+			contributors = None
+		
+		if contributors:
+			for contributor in contributors:
+				self.contributors.name  = contributor['name']
+				self.contributors.email = contributor['email']
+		
+		builders = None
+		
+		try:
+			scripts = jsonConfig['scripts']
+		except KeyError:
+			scripts = None
+		
+		if scripts:
+			try:
+				builders = scripts['build']
+			except KeyError:
+				pass
+		
+		if builders:
+			if builders is str:
+				builders = [builders]
+	
+			self.builders = []
+		
+			for builder_config in builders:
+				try:
+					builder_name = builder_config[ 'builder' ]
+				except (KeyError, TypeError):
+					# Shell is default
+					builder_name = 'sh'
+					
+				
+				BUILDERS = { 'pkg-config': Builders.pkg_config,
+				             'sh'        : Builders.shell
+				}
+				
+				bound_builder = partial(BUILDERS[builder_name], builder_config)
+				
+				self.builders.append(bound_builder)
+
+		try:
+			self.ignore_archive_root = jsonConfig['ignore_archive_root']
+		except KeyError:
+			pass
+		
+		try:
+			licenses = jsonConfig['licenses']
+		except KeyError:
+			licenses = None
+		
+		if licenses:
+			if licenses is str:
+				licenses = [licenses]
+
+			self.licenses = licenses
+
+class VersionConfig(BaseConfig):
+	def __init__(self, package, config):
+		BaseConfig.__init__(self, config)
+		
+		self.parent = package.config
+		
+		try:
+			self.name
+		except AttributeError:
+			self.name = self.parent.name
+		
+		try:
+			self.version
+		except AttributeError:
+			self.version = self.parent.version
+		
+		try:
+			self.contributors
+		except AttributeError:
+			try:
+				self.contributors = self.parent.contributors
+			except AttributeError:
+				self.contributors = []
+		
+		try:
+			self.builders
+		except AttributeError:
+			# For now we force builders to be present
+			self.builders = self.parent.builders
+		
+		try:
+			self.ignore_archive_root
+		except AttributeError:
+			try:
+				self.ignore_archive_root = self.parent.ignore_archive_root
+			except AttributeError:
+				# Fallback to default
+				self.ignore_archive_root = False
+		
+		try:
+			self.licenses
+		except AttributeError:
+			try:
+				self.licenses = self.parent.licenses
+			except AttributeError:
+				raise RuntimeError('Config error - license information missing.')
 
 class Version:
 	def __init__(self, package, config):
 		self.package = package
+		
+		self.config = VersionConfig(package, config)
 
-		commands = config.get( "build" )
-		if commands is str:
-			self.build_commands = [commands]
-		else:
-			self.build_commands = commands
-		if self.build_commands is None:
-			try:
-				self.build_commands = self.package.build_commands
-			except AttributeError:
-				self.build_commands = []
-
-		self.string = Version.version_string( config )
+		self.string = self.config.version
 		assert self.string is not None
 		
-		self.version = Version.version_id( config )
+		self.version = self.version_id()
 
 		# Get where we should retrieve the source
-		self.uri = config.get( "src" )
-		if self.uri is None:
-			try:
-				self.uri = self.package.uri
-			except AttributeError:
-				pass
-		assert self.uri is not None
-		
-		self.ignore_archive_root = config.get( "ignore_archive_root" )
-		
-		if self.ignore_archive_root is None:
-			try:
-				self.ignore_archive_root = self.package.ignore_archive_root
-			except AttributeError:
-				self.ignore_archive_root = False
-	@staticmethod
-	def version_string( version_config ):
-		return version_config.get( "version" )
-	
-	@staticmethod
-	def version_id( version_config ):
-		return LooseVersion( Version.version_string(version_config) )
+		self.uri = config['src']
+
+	def version_id(self):
+		return LooseVersion( self.string )
 	
 	def path( self ):
 		return os.path.join( self.package.path(), self.string )
@@ -250,7 +325,7 @@ class Version:
 		os.environ["prefix"] = self.system_path()
 	
 	def build( self ):
-		if len( self.build_commands ) is 0:
+		if len( self.config.builders ) is 0:
 			print 'no build commands specified - nothing to invoke'
 			return
 		
@@ -264,47 +339,9 @@ class Version:
 		env[ 'PATH'                  ] += os.pathsep + shared.__rootpath__
 		env[ 'EMSCRIPTEN_SYSTEM_ROOT'] = self.system_path()
 		env[ 'EMSCRIPTEN_ROOT'       ] = shared.__rootpath__.replace('\\', '/')
-	
-		builders = { "pkg-config": Builders.pkg_config,
-		             "sh"        : Builders.shell
-		}
 
-		for build_command in self.build_commands:
-			"""
-			has_url = False
-			try:
-				build_command = build_command.get( 'url' )
-				has_url = True
-			except AttributeError:
-				pass
-			
-			if has_url:
-				# Download first
-				temp_tuple = tempfile.mkstemp( suffix='.py', text=True )
-				temp_file_path = temp_tuple[1]
-				with contextlib.closing( urllib2.urlopen(build_command) ) as file:
-					temp_file_path.write( file )
-				# Make sure we have exec permissions
-				#os.chmod( temp_file_path, stat.S_IRUSR | stat.S_IEXEC | stat.S_IWUSR )
-				build_command = [ 'python2', temp_file_path ]
-				# We have to close the file for this process because most os do not allow
-				# for multiple processes accessing the same file concurrently
-				os.close( temp_tuple[0] )
-				try:
-					subprocess.check_call( build_command, cwd=self.path(), env=env )
-				finally:
-					os.remove( temp_file_path )
-			else:
-			"""
-			try:
-				builder_name = build_command[ "builder" ]
-			except (KeyError, TypeError):
-				# Shell is default
-				builder_name = "sh"
-				
-			builder = builders[builder_name]
-			builder( build_command, self.path(), env )
-		
+		for builder in self.config.builders:
+			builder( self.path(), env )
 	
 	def is_built( self ):
 		versionPath = self.path()
@@ -322,7 +359,7 @@ class Version:
 		return archiveMime
 	
 	def fetch_archive( self, archive_path ):
-		if self.ignore_archive_root:
+		if self.config.ignore_archive_root:
 			# Extract indirectly, since we do not want the whole archive
 			dir_path = lib_dir.get_path( '.package_folder' )
 			try:
@@ -344,7 +381,7 @@ class Version:
 		  ('application/x-tar', 'xz'       ): Extract.tarxz
 		}[ archiveMime ]( archive_path, dir_path )
 		
-		if self.ignore_archive_root:
+		if self.config.ignore_archive_root:
 			root_dirs = os.listdir( dir_path )
 			assert len(root_dirs) is 1
 
@@ -406,53 +443,65 @@ class Package:
 		if not valid_name == package_name:
 			raise Exception( "Did you mean %s" % valid_name )
 		self.name = package_name
-		self.uri  = None
-		self.ignore_archive_root = None
-		self.build_commands = []
-		self.versions       = []
-		version_dict = dict()
 		
-		# Load all information top down
-		for repo_uri in lib_dir.repositories():
-			repo_uri = urljoin( repo_uri + '/', package_name + '/package.json' )
+		repositories = lib_dir.repositories()
+		
+		repo_uri = repositories[0]
+		package_uri = repo_uri + '/' + package_name + '/'
+		
+		package_request = requests.get(package_uri + 'package.json')
+		
+		version_requests = []
+		for repo_uri in repositories:
+			package_uri = repo_uri + '/' + package_name + '/'
+			version_uri = package_uri + 'versions'
 			
+			version_requests.append(requests.get(version_uri))
+
+		enabled_versions = []
+
+		for version_request in version_requests:
 			try:
-				with contextlib.closing( urllib2.urlopen(repo_uri) ) as temp_file:
-					try:
-						config = json.load( temp_file )
-					except:
-						print >> sys.stderr, 'Invalid json format from ' + repo_uri
-						continue
-			except urllib2.HTTPError, e:
-				print >> sys.stderr, repo_uri + ' ' + str(e.code) + ': ' + e.msg
+				version_request.raise_for_status()
+			except requests.exceptions.HTTPError:
 				continue
-
-			if self.uri is None:
-				self.uri    = config.get( "src" )
 			
-			if self.uri is None:
-				self.ignore_archive_root = config.get( "ignore_archive_root" )
-		
-			if len( self.build_commands ) is 0:
-				commands = config.get( "build" )
-				if commands is None:
-					pass
-				elif type(commands) is list:
-					self.build_commands = commands
-				else:
-					self.build_commands = [commands]
-		
-			for version_config in config.get("versions"):
-				#FIXME: This is stricter, than looseversion is
-				id = Version.version_string( version_config )
-				if id in version_dict:
+			for version in version_request.text.splitlines():
+				if not version:
 					continue
-				version_dict[ id ] = Version( self, version_config )
-
-		for key, version in version_dict.iteritems():
-			self.versions.append( version )
+				enabled_versions.append(version)
 		
-		mergesort( self.versions )
+		del version_requests[:]
+		
+		if len(enabled_versions) is 0:
+			raise LookupError('No versions for package \'%s\' were found.' % package_name)
+
+		try:
+			base_config = package_request.json()
+		except:
+			base_config = dict()
+		
+		self.config = BaseConfig(base_config)
+		self._version_dict = dict()
+		
+		# Search for versions in all repositories
+		for repo_uri in repositories:
+			package_uri = repo_uri + '/' + package_name + '/'
+			
+			for version in enabled_versions:
+				version_request = requests.get(package_uri + version + '/package.json')
+				version_requests.append( version_request )
+			
+		for version_request in version_requests:
+			json = version_request.json()
+			version = Version( self, json )
+			self._version_dict[version.string] = version
+
+		self._versions = []
+		for key, version in self._version_dict.iteritems():
+			self._versions.append( version )
+		
+		list.sort(self._versions)
 	
 	def path( self ):
 		return lib_dir.get_source_path( self.name )
@@ -461,7 +510,13 @@ class Package:
 		return lib_dir.get_system_path( self.name )
 	
 	def highest_version( self ):
-		return self.versions[-1]
+		return self._versions[-1]
+	
+	def version(self, name):
+		try:
+			return self._version_dict[name]
+		except KeyError:
+			raise LookupError('Version \'%s\' not known' % name)
 		
 class Builders:
 	@staticmethod
