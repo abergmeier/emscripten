@@ -2,6 +2,7 @@
 
 import sys, os, urllib2, zipfile, tarfile, shutil, subprocess, contextlib
 import mimetypes, StringIO, bz2, tempfile, stat, gzip, glob, json
+import weakref
 from urlparse import urlparse
 from functools import partial
 
@@ -199,6 +200,10 @@ class BaseConfig:
 			for contributor in contributors:
 				self.contributors.name  = contributor['name']
 				self.contributors.email = contributor['email']
+		try:
+			self.dependencies = jsonConfig['dependencies']
+		except KeyError:
+			pass
 		
 		builders = None
 		
@@ -274,6 +279,14 @@ class VersionConfig(BaseConfig):
 				self.contributors = self.parent.contributors
 			except AttributeError:
 				self.contributors = []
+		
+		try:
+			self.dependencies
+		except AttributeError:
+			try:
+				self.dependencies = self.parent.dependencies
+			except AttributeError:
+				self.dependencies = dict()
 		
 		try:
 			self.builders
@@ -416,7 +429,6 @@ class Version:
 					# We have to flush or the data does not get written
 					temp_file.flush()
 				self.fetch_archive( temp_file.name )
-		
 
 	def __lt__( self, other ):
 		return self.version < other.version
@@ -564,4 +576,29 @@ class Builders:
 	@staticmethod
 	def shell( command, cwd, env ):
 		subprocess.check_call( ['sh', '-c', command], cwd=cwd, env=env )
+
+class Node:
+  _nodes = weakref.WeakKeyDictionary()
+  def __new__(cls, version):
+    try:
+      node = _nodes[version]()
+    except KeyError:
+      node = None
+    
+    if node is None:
+      node = super(Node, cls).__new__(cls)
+      _nodes[version] = weakref.ref(node)
+    
+    return node
+  
+  def __init__(self, version):
+    self.version = version
+    self.edges   = []
+
+  def addEdge(self, node):
+    if node is not Node:
+      node = Node(node)
+    self.edges.append(node)
+  
+  
 

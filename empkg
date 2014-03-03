@@ -56,8 +56,16 @@ class Arguments:
 	
 	def handle_get( self, package_versions ):
 		to_download = []
+		
 		for package_version in package_versions:
 			to_download.append(package_version)
+		
+		# Build dependency list
+		rootNode = PkgNode()
+		for version in to_download:
+			rootNode.addEdge(version)
+		
+		to_download = rootNode.resolve()
 		
 		print 'The following package sources will be installed:'
 		for version in to_download:
@@ -123,4 +131,32 @@ class Arguments:
 
 args = Arguments()
 args.handle()
+
+class PkgNode(pkg_module.Node):
+  def __init__(self):
+    pkg_module.Node.__init__()
+  
+  def resolve(self):
+    return _resolve(self)
+
+  def _resolve(node, nodes, resolved, unresolved_parents):
+    if len(node.edges) is 0:
+      # Try to load edges
+      for package_name, package_version in edge.version.config.dependencies.iteritems():
+        version = pkg_module.Package(package_name).version(package_version)
+        node = pkg_module.Node(version)
+        self.addEdge(node)
+    
+    for edge in node.edges:
+      if edge in resolved:
+        continue
+      
+      if edge in unresolved_parents:
+        raise Exception('Smells like circular dependency between %s and %s' % (edge.version.name, node.version.name) )
+      _resolve(edge, nodes, resolved, unresolved_parents)
+    resolved.append(node)
+    unresolved_parents.remove(node)
+
+
+
 
